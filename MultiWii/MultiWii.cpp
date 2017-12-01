@@ -562,6 +562,9 @@ void annexCode() { // this code is excetuted at each loop and won't interfere wi
 
   #if !(defined(SERIAL_RX) && defined(PROMINI))  //Only one serial port on ProMini.  Skip serial com if SERIAL RX in use. Note: Spek code will auto-call serialCom if GUI data detected on serial0.
     serialCom();
+    #if defined(GPS_SWSERIAL_RX)
+      serialCom_GPS();
+    #endif
   #endif
 
   #if defined(POWERMETER)
@@ -708,7 +711,7 @@ void setup() {
   #endif
   /************************************/
   #if GPS
-    #if defined(GPS_SERIAL)
+    #if defined(GPS_SERIAL) || defined(GPS_SWSERIAL_RX)
       GPS_SerialInit();
     #endif
     GPS_conf.max_wp_number = getMaxWPNumber(); 

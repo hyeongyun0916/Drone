@@ -177,6 +177,7 @@ enum MSP_protocol_bytes {
 };
 
 void serialCom() {
+  
   uint8_t c,cc,port,state,bytesTXBuff;
   static uint8_t offset[UART_NUMBER];
   static uint8_t dataSize[UART_NUMBER];
@@ -258,6 +259,7 @@ void serialCom() {
     } // while
   } // for
 }
+
 
 void evaluateCommand(uint8_t c) {
   uint32_t tmp=0; 
@@ -742,7 +744,9 @@ void evaluateOtherData(uint8_t sr) {
         // on the GPS port, we must avoid interpreting incoming values for other commands because there is no
         // protocol protection as is with MSP commands
         // doing so with single chars would be prone to error.
-        if (CURRENTPORT == GPS_SERIAL) return;
+        #if defined(GPS_SERIAL)
+          if (CURRENTPORT == GPS_SERIAL) return;
+        #endif
       #endif
     #endif
     switch (sr) {

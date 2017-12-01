@@ -1,6 +1,8 @@
 #ifndef GPS_H_
 #define GPS_H_
 
+void serialCom_GPS();
+
 //Function prototypes for GPS frame parsing
 bool GPS_newFrame(uint8_t c);
 extern uint8_t GPS_Frame;            // a valid GPS_Frame was detected, and data is ready for nav computation

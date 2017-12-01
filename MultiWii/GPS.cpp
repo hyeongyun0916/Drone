@@ -9,6 +9,38 @@
 #include "EEPROM.h"
 #include <math.h>
 
+#include <SoftwareSerial.h>
+SoftwareSerial SwSerial_GPS(GPS_SWSERIAL_RX, GPS_SWSERIAL_TX);
+
+void serialCom_GPS(void)
+{
+  uint8_t c,cc,port;
+  
+  uint32_t timeMax2; // limit max time in this function in case of GPS
+  timeMax2 = micros();
+  cc = SwSerial_GPS.available();
+      
+  #define RX_COND
+  while (cc-- RX_COND) {    
+    c = SwSerial_GPS.read();
+    // SERIAL: try to detect a new nav frame based on the current received buffer
+    static uint32_t GPS_last_frame_seen; //Last gps frame seen at this time, used to detect stalled gps communication
+    if (GPS_newFrame(c)) {            //We had a valid GPS data frame, so signal task scheduler to switch to compute
+      if (GPS_update == 1) GPS_update = 0; else GPS_update = 1; //Blink GPS update
+      GPS_last_frame_seen = timeMax2;
+      GPS_Frame = 1;
+    }
+    // Check for stalled GPS, if no frames seen for 1.2sec then consider it LOST
+    if ((timeMax2 - GPS_last_frame_seen) > 1200000) {
+      //No update since 1200ms clear fix...
+      f.GPS_FIX = 0;
+      GPS_numSat = 0;
+    }
+    if (micros()-timeMax2>250) return;  // Limit the maximum execution time of serial decoding to avoid time spike
+  } // while
+}
+
+
 #if GPS
 
 //Function prototypes for other GPS functions
@@ -1002,7 +1034,7 @@ int32_t wrap_18000(int32_t ang) {
 /**************************************************************************************/
 /**************************************************************************************/
 
-#if defined(GPS_SERIAL)
+#if defined(GPS_SERIAL) || defined(GPS_SWSERIAL_RX)
 
 /**************************************************************************************/
 /***********************       NMEA                          **************************/
@@ -1023,7 +1055,13 @@ int32_t wrap_18000(int32_t ang) {
 #define FRAME_RMC  2
 
 void GPS_SerialInit(void) {
-  SerialOpen(GPS_SERIAL,GPS_BAUD);
+  
+  #if defined(GPS_SWSERIAL_RX)
+    SwSerial_GPS.begin(GPS_SWSERIAL_BAUD);
+  #else
+    SerialOpen(GPS_SERIAL,GPS_BAUD);
+  #endif
+  
   delay(1000);
 }
 
@@ -1042,13 +1080,13 @@ bool GPS_newFrame(uint8_t c) {
       if (string[0] == 'G' && string[1] == 'P' && string[2] == 'G' && string[3] == 'G' && string[4] == 'A') frame = FRAME_GGA;
       if (string[0] == 'G' && string[1] == 'P' && string[2] == 'R' && string[3] == 'M' && string[4] == 'C') frame = FRAME_RMC;
     } else if (frame == FRAME_GGA) {
-      if      (param == 2)                     {GPS_coord[LAT] = GPS_coord_to_degrees(string);}
-      else if (param == 3 && string[0] == 'S') GPS_coord[LAT] = -GPS_coord[LAT];
-      else if (param == 4)                     {GPS_coord[LON] = GPS_coord_to_degrees(string);}
-      else if (param == 5 && string[0] == 'W') GPS_coord[LON] = -GPS_coord[LON];
-      else if (param == 6)                     {f.GPS_FIX = (string[0]  > '0');}
-      else if (param == 7)                     {GPS_numSat = grab_fields(string,0);}
-      else if (param == 9)                     {GPS_altitude = grab_fields(string,0);}  // altitude in meters added by Mis
+      if      (param == 2)                     { GPS_coord[LAT] = GPS_coord_to_degrees(string); }
+      else if (param == 3 && string[0] == 'S') { GPS_coord[LAT] = -GPS_coord[LAT]; }
+      else if (param == 4)                     { GPS_coord[LON] = GPS_coord_to_degrees(string); }
+      else if (param == 5 && string[0] == 'W') { GPS_coord[LON] = -GPS_coord[LON]; }
+      else if (param == 6)                     { f.GPS_FIX = (string[0]  > '0'); }
+      else if (param == 7)                     { GPS_numSat = grab_fields(string,0); }
+      else if (param == 9)                     { GPS_altitude = grab_fields(string,0); }  // altitude in meters added by Mis
     } else if (frame == FRAME_RMC) {
       if      (param == 7)                     {GPS_speed = ((uint32_t)grab_fields(string,1)*5144L)/1000L;}  //gps speed in cm/s will be used for navigation
       else if (param == 8)                     {GPS_ground_course = grab_fields(string,1); }                 //ground course deg*10 
@@ -1071,7 +1109,6 @@ bool GPS_newFrame(uint8_t c) {
   return frameOK && (frame==FRAME_GGA);
 }
 #endif //NMEA
-
 
 
 /**************************************************************************************/

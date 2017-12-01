@@ -1666,7 +1666,7 @@
   #define BARO 0
 #endif
 
-#if defined(GPS_SERIAL)  || defined(I2C_GPS)
+#if defined(GPS_SERIAL)  || defined(I2C_GPS) || defined(GPS_SWSERIAL_RX)
   #define GPS 1
 #else
   #define GPS 0
